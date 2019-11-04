@@ -47,13 +47,6 @@ elif [[ ! -z "$1" ]]; then
     exit 1
 fi
 
-# Install python dependencies
-read -r -p "Tensorflow 2.0 will be installed if it is not already. Are You Sure? [y/n] " reply
-case $reply in
-    [yY]*) echo "Installing...";;
-    * ) echo "Goodbye!"; exit;;
-esac
-
 BUILD_DEPS_DIR=build_deps
 REQUIREMENTS_TXT=$BUILD_DEPS_DIR/requirements.txt
 
