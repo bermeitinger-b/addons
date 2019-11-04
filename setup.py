@@ -66,15 +66,6 @@ REQUIRED_PACKAGES = [
     'six >= 1.10.0',
 ]
 
-if project_name == TFA_RELEASE:
-    # TODO: remove if-else condition when tf supports package consolidation.
-    if platform.system() == 'Linux':
-        REQUIRED_PACKAGES.append('tensorflow-gpu >= 2.0.0')
-    else:
-        REQUIRED_PACKAGES.append('tensorflow >= 2.0.0')
-elif project_name == TFA_NIGHTLY:
-    REQUIRED_PACKAGES.append('tf-nightly')
-
 
 class BinaryDistribution(Distribution):
     """This class is needed in order to create OS specific wheels."""
