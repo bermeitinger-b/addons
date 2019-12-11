@@ -29,6 +29,7 @@ from tensorflow_addons.optimizers import Lookahead
 class LookaheadTest(tf.test.TestCase):
     def run_dense_sample(self, iterations, optimizer, seed=0x2019):
         np.random.seed(seed)
+        tf.random.set_seed(seed)
 
         val_0 = np.random.random((2,))
         val_1 = np.random.random((2,))
@@ -56,6 +57,7 @@ class LookaheadTest(tf.test.TestCase):
 
     def run_sparse_sample(self, iterations, optimizer, seed=0x2019):
         np.random.seed(seed)
+        tf.random.set_seed(seed)
 
         val_0 = np.random.random((2,))
         val_1 = np.random.random((2,))
@@ -109,6 +111,7 @@ class LookaheadTest(tf.test.TestCase):
 
     def test_fit_simple_linear_model(self):
         np.random.seed(0x2019)
+        tf.random.set_seed(0x2019)
 
         x = np.random.standard_normal((100000, 3))
         w = np.random.standard_normal((3, 1))
@@ -148,7 +151,6 @@ class LookaheadTest(tf.test.TestCase):
         self.assertAllClose(opt.lr.read_value(), 1e-4)
 
     def test_get_config(self):
-        self.skipTest('Wait #33614 to be fixed')
         opt = Lookahead('adam', sync_period=10, slow_step_size=0.4)
         opt = tf.keras.optimizers.deserialize(
             tf.keras.optimizers.serialize(opt))

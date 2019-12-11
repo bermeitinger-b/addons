@@ -20,10 +20,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow_addons.utils import keras_utils
 
 
-@keras_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable(package='Addons')
 class SigmoidFocalCrossEntropy(tf.keras.losses.Loss):
     """Implements the focal loss function.
 
@@ -42,10 +41,10 @@ class SigmoidFocalCrossEntropy(tf.keras.losses.Loss):
     fl = tfa.losses.SigmoidFocalCrossEntropy()
     loss = fl(
       [[0.97], [0.91], [0.03]],
-      [[1], [1], [0])
-    print('Loss: ', loss.numpy())  # Loss: [[0.03045921]
-                                            [0.09431068]
-                                            [0.31471074]
+      [[1.0], [1.0], [0.0]])
+    print('Loss: ', loss.numpy())  # Loss: [[0.00010971]
+                                            [0.0032975]
+                                            [0.00030611]]
     ```
     Usage with tf.keras API:
 
@@ -98,7 +97,7 @@ class SigmoidFocalCrossEntropy(tf.keras.losses.Loss):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-@keras_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable(package='Addons')
 @tf.function
 def sigmoid_focal_crossentropy(y_true,
                                y_pred,

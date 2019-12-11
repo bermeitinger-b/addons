@@ -25,10 +25,9 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tensorflow_addons.utils import keras_utils
 
 
-@keras_utils.register_keras_custom_object
+@tf.keras.utils.register_keras_serializable(package='Addons')
 class LazyAdam(tf.keras.optimizers.Adam):
     """Variant of the Adam optimizer that handles sparse updates more
     efficiently.
@@ -58,7 +57,8 @@ class LazyAdam(tf.keras.optimizers.Adam):
         """Constructs a new LazyAdam optimizer.
 
         Args:
-          learning_rate: A `Tensor` or a floating point value.
+          learning_rate: A `Tensor` or a floating point value. or a schedule
+            that is a `tf.keras.optimizers.schedules.LearningRateSchedule`
             The learning rate.
           beta_1: A `float` value or a constant `float` tensor.
             The exponential decay rate for the 1st moment estimates.

@@ -5,6 +5,7 @@
 |:---------- |:----------- |:------------- |
 | contrastive |  @WindQAQ | windqaq@gmail.com |
 | focal_loss | @SSaishruthi  | saishruthi.tn@gmail.com |
+| giou_loss | @fsx950223  | fsx950223@gmail.com |
 | lifted | @rahulunair | rahulunair@gmail.com  |
 | npairs | @WindQAQ | windqaq@gmail.com |
 | sparsemax_loss | @AndreasMadsen | amwwebdk+github@gmail.com |
@@ -15,6 +16,7 @@
 |:----------------------- |:---------------------|:--------------------------|
 | contrastive | ContrastiveLoss | http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf |
 | focal_loss | SigmoidFocalCrossEntropy | https://arxiv.org/abs/1708.02002  |
+| giou_loss | GIoULoss | https://giou.stanford.edu/GIoU.pdf       |
 | lifted | LiftedStructLoss | https://arxiv.org/abs/1511.06452       |
 | npairs | NpairsLoss | http://www.nec-labs.com/uploads/images/Department-Images/MediaAnalytics/papers/nips16_npairmetriclearning.pdf |
 | npairs | NpairsMultilabelLoss | http://www.nec-labs.com/uploads/images/Department-Images/MediaAnalytics/papers/nips16_npairmetriclearning.pdf |
@@ -27,8 +29,7 @@
 In order to conform with the current API standard, all losses
 must:
  * Inherit from `keras.losses.Loss`.
- * [Register as a keras global object](https://github.com/tensorflow/addons/blob/master/tensorflow_addons/utils/keras_utils.py)
-  so it can be serialized properly.
+ * Register as a keras global object so it can be serialized properly: `@tf.keras.utils.register_keras_serializable(package='Addons')`
  * Add the addon to the `py_library` in this sub-package's BUILD file.
 
 #### Testing Requirements
