@@ -16,47 +16,6 @@
 #
 # Usage: install_ci_dependency.sh [--quiet]
 #
-# Options:
-#  --quiet  Give less output.
 
-QUIET_FLAG=""
-if [[ $1 == "--quiet" ]]; then
-    QUIET_FLAG="--quiet"
-elif [[ ! -z "$1" ]]; then
-    echo "Found unsupported args: $@"
-    exit 1
-fi
 
-# Current script directory
-SCRIPT_DIR=$( cd ${0%/*} && pwd -P )
-
-ROOT_DIR=$( cd "$SCRIPT_DIR/../../.." && pwd -P )
-if [[ ! -d "tensorflow_addons" ]]; then
-    echo "ERROR: PWD: $PWD is not project root"
-    exit 1
-fi
-
-# Install python dependencies:
-CI_REQUIREMENT="$SCRIPT_DIR/ci_requirements.txt"
-pip install ${QUIET_FLAG} -r ${CI_REQUIREMENT}
-
-# Download buildifier.
-wget ${QUIET_FLAG} https://github.com/bazelbuild/buildtools/releases/download/0.4.5/buildifier
-chmod +x buildifier
-sudo mv buildifier /usr/local/bin/.
-
-# Download buildozer.
-wget ${QUIET_FLAG} https://github.com/bazelbuild/buildtools/releases/download/0.4.5/buildozer
-chmod +x buildozer
-sudo mv buildozer /usr/local/bin/.
-
-# Install clang-format
-apt-get update -qq && apt-get install -y clang-format-3.8
-
-# Check clang-format:
-CLANG_FORMAT=${CLANG_FORMAT:-clang-format-3.8}
-which ${CLANG_FORMAT} > /dev/null
-if [[ $? != "0" ]]; then
-    echo "ERROR: cannot find clang-format, please install it."
-    exit 1
-fi
+python3 -m pip install black
