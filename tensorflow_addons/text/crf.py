@@ -16,12 +16,20 @@
 import numpy as np
 import tensorflow as tf
 
+from tensorflow_addons.utils.types import TensorLike
+from typeguard import typechecked
+from typing import Optional
+
 # TODO: Wrap functions in @tf.function once
 # https://github.com/tensorflow/tensorflow/issues/29075 is resolved
 
 
-def crf_sequence_score(inputs, tag_indices, sequence_lengths,
-                       transition_params):
+def crf_sequence_score(
+    inputs: TensorLike,
+    tag_indices: TensorLike,
+    sequence_lengths: TensorLike,
+    transition_params: TensorLike,
+) -> tf.Tensor:
     """Computes the unnormalized score for a tag sequence.
 
     Args:
@@ -51,24 +59,30 @@ def crf_sequence_score(inputs, tag_indices, sequence_lengths,
         sequence_scores = tf.gather_nd(inputs, indices)
 
         sequence_scores = tf.where(
-            tf.less_equal(sequence_lengths, 0), tf.zeros_like(sequence_scores),
-            sequence_scores)
+            tf.less_equal(sequence_lengths, 0),
+            tf.zeros_like(sequence_scores),
+            sequence_scores,
+        )
         return sequence_scores
 
     def _multi_seq_fn():
         # Compute the scores of the given tag sequence.
         unary_scores = crf_unary_score(tag_indices, sequence_lengths, inputs)
-        binary_scores = crf_binary_score(tag_indices, sequence_lengths,
-                                         transition_params)
+        binary_scores = crf_binary_score(
+            tag_indices, sequence_lengths, transition_params
+        )
         sequence_scores = unary_scores + binary_scores
         return sequence_scores
 
-    return tf.cond(
-        tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
+    return tf.cond(tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
 
 
-def crf_multitag_sequence_score(inputs, tag_bitmap, sequence_lengths,
-                                transition_params):
+def crf_multitag_sequence_score(
+    inputs: TensorLike,
+    tag_bitmap: TensorLike,
+    sequence_lengths: TensorLike,
+    transition_params: TensorLike,
+) -> tf.Tensor:
     """Computes the unnormalized score of all tag sequences matching
     tag_bitmap.
 
@@ -93,14 +107,14 @@ def crf_multitag_sequence_score(inputs, tag_bitmap, sequence_lengths,
     """
     tag_bitmap = tf.cast(tag_bitmap, dtype=tf.bool)
     sequence_lengths = tf.cast(sequence_lengths, dtype=tf.int32)
-    filtered_inputs = tf.where(tag_bitmap, inputs,
-                               tf.fill(tf.shape(inputs), float("-inf")))
+    filtered_inputs = tf.where(
+        tag_bitmap, inputs, tf.fill(tf.shape(inputs), float("-inf"))
+    )
 
     # If max_seq_len is 1, we skip the score calculation and simply gather the
     # unary potentials of all active tags.
     def _single_seq_fn():
-        return tf.reduce_logsumexp(
-            filtered_inputs, axis=[1, 2], keepdims=False)
+        return tf.reduce_logsumexp(filtered_inputs, axis=[1, 2], keepdims=False)
 
     def _multi_seq_fn():
         # Compute the logsumexp of all scores of sequences
@@ -108,13 +122,15 @@ def crf_multitag_sequence_score(inputs, tag_bitmap, sequence_lengths,
         return crf_log_norm(
             inputs=filtered_inputs,
             sequence_lengths=sequence_lengths,
-            transition_params=transition_params)
+            transition_params=transition_params,
+        )
 
-    return tf.cond(
-        tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
+    return tf.cond(tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
 
 
-def crf_log_norm(inputs, sequence_lengths, transition_params):
+def crf_log_norm(
+    inputs: TensorLike, sequence_lengths: TensorLike, transition_params: TensorLike
+) -> tf.Tensor:
     """Computes the normalization for a CRF.
 
     Args:
@@ -137,8 +153,8 @@ def crf_log_norm(inputs, sequence_lengths, transition_params):
         log_norm = tf.reduce_logsumexp(first_input, [1])
         # Mask `log_norm` of the sequences with length <= zero.
         log_norm = tf.where(
-            tf.less_equal(sequence_lengths, 0), tf.zeros_like(log_norm),
-            log_norm)
+            tf.less_equal(sequence_lengths, 0), tf.zeros_like(log_norm), log_norm
+        )
         return log_norm
 
     def _multi_seq_fn():
@@ -147,23 +163,25 @@ def crf_log_norm(inputs, sequence_lengths, transition_params):
         # Compute the alpha values in the forward algorithm in order to get the
         # partition function.
 
-        alphas = crf_forward(rest_of_input, first_input, transition_params,
-                             sequence_lengths)
+        alphas = crf_forward(
+            rest_of_input, first_input, transition_params, sequence_lengths
+        )
         log_norm = tf.reduce_logsumexp(alphas, [1])
         # Mask `log_norm` of the sequences with length <= zero.
         log_norm = tf.where(
-            tf.less_equal(sequence_lengths, 0), tf.zeros_like(log_norm),
-            log_norm)
+            tf.less_equal(sequence_lengths, 0), tf.zeros_like(log_norm), log_norm
+        )
         return log_norm
 
-    return tf.cond(
-        tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
+    return tf.cond(tf.equal(tf.shape(inputs)[1], 1), _single_seq_fn, _multi_seq_fn)
 
 
-def crf_log_likelihood(inputs,
-                       tag_indices,
-                       sequence_lengths,
-                       transition_params=None):
+def crf_log_likelihood(
+    inputs: TensorLike,
+    tag_indices: TensorLike,
+    sequence_lengths: TensorLike,
+    transition_params: Optional[TensorLike] = None,
+) -> tf.Tensor:
     """Computes the log-likelihood of tag sequences in a CRF.
 
     Args:
@@ -189,10 +207,12 @@ def crf_log_likelihood(inputs,
     if transition_params is None:
         initializer = tf.keras.initializers.GlorotUniform()
         transition_params = tf.Variable(
-            initializer([num_tags, num_tags]), "transitions")
+            initializer([num_tags, num_tags]), "transitions"
+        )
 
-    sequence_scores = crf_sequence_score(inputs, tag_indices, sequence_lengths,
-                                         transition_params)
+    sequence_scores = crf_sequence_score(
+        inputs, tag_indices, sequence_lengths, transition_params
+    )
     log_norm = crf_log_norm(inputs, sequence_lengths, transition_params)
 
     # Normalize the scores to get the log-likelihood per example.
@@ -200,7 +220,9 @@ def crf_log_likelihood(inputs,
     return log_likelihood, transition_params
 
 
-def crf_unary_score(tag_indices, sequence_lengths, inputs):
+def crf_unary_score(
+    tag_indices: TensorLike, sequence_lengths: TensorLike, inputs: TensorLike
+) -> tf.Tensor:
     """Computes the unary scores of tag sequences.
 
     Args:
@@ -227,17 +249,20 @@ def crf_unary_score(tag_indices, sequence_lengths, inputs):
     flattened_tag_indices = tf.reshape(offsets + tag_indices, [-1])
 
     unary_scores = tf.reshape(
-        tf.gather(flattened_inputs, flattened_tag_indices),
-        [batch_size, max_seq_len])
+        tf.gather(flattened_inputs, flattened_tag_indices), [batch_size, max_seq_len]
+    )
 
     masks = tf.sequence_mask(
-        sequence_lengths, maxlen=tf.shape(tag_indices)[1], dtype=tf.float32)
+        sequence_lengths, maxlen=tf.shape(tag_indices)[1], dtype=tf.float32
+    )
 
     unary_scores = tf.reduce_sum(unary_scores * masks, 1)
     return unary_scores
 
 
-def crf_binary_score(tag_indices, sequence_lengths, transition_params):
+def crf_binary_score(
+    tag_indices: TensorLike, sequence_lengths: TensorLike, transition_params: TensorLike
+) -> tf.Tensor:
     """Computes the binary scores of tag sequences.
 
     Args:
@@ -259,22 +284,26 @@ def crf_binary_score(tag_indices, sequence_lengths, transition_params):
     end_tag_indices = tf.slice(tag_indices, [0, 1], [-1, num_transitions])
 
     # Encode the indices in a flattened representation.
-    flattened_transition_indices = start_tag_indices * \
-        num_tags + end_tag_indices
+    flattened_transition_indices = start_tag_indices * num_tags + end_tag_indices
     flattened_transition_params = tf.reshape(transition_params, [-1])
 
     # Get the binary scores based on the flattened representation.
-    binary_scores = tf.gather(flattened_transition_params,
-                              flattened_transition_indices)
+    binary_scores = tf.gather(flattened_transition_params, flattened_transition_indices)
 
     masks = tf.sequence_mask(
-        sequence_lengths, maxlen=tf.shape(tag_indices)[1], dtype=tf.float32)
+        sequence_lengths, maxlen=tf.shape(tag_indices)[1], dtype=tf.float32
+    )
     truncated_masks = tf.slice(masks, [0, 1], [-1, -1])
     binary_scores = tf.reduce_sum(binary_scores * truncated_masks, 1)
     return binary_scores
 
 
-def crf_forward(inputs, state, transition_params, sequence_lengths):
+def crf_forward(
+    inputs: TensorLike,
+    state: TensorLike,
+    transition_params: TensorLike,
+    sequence_lengths: TensorLike,
+) -> tf.Tensor:
     """Computes the alpha values in a linear-chain CRF.
 
     See http://www.cs.columbia.edu/~mcollins/fb.pdf for reference.
@@ -295,7 +324,8 @@ def crf_forward(inputs, state, transition_params, sequence_lengths):
     sequence_lengths = tf.cast(sequence_lengths, dtype=tf.int32)
 
     last_index = tf.maximum(
-        tf.constant(0, dtype=sequence_lengths.dtype), sequence_lengths - 1)
+        tf.constant(0, dtype=sequence_lengths.dtype), sequence_lengths - 1
+    )
     inputs = tf.transpose(inputs, [1, 0, 2])
     transition_params = tf.expand_dims(transition_params, 0)
 
@@ -313,7 +343,7 @@ def crf_forward(inputs, state, transition_params, sequence_lengths):
     return tf.gather_nd(all_alphas, idxs)
 
 
-def viterbi_decode(score, transition_params):
+def viterbi_decode(score: TensorLike, transition_params: TensorLike) -> tf.Tensor:
     """Decode the highest scoring sequence of tags outside of TensorFlow.
 
     This should only be used at test time.
@@ -348,7 +378,8 @@ def viterbi_decode(score, transition_params):
 class CrfDecodeForwardRnnCell(tf.keras.layers.AbstractRNNCell):
     """Computes the forward decoding in a linear-chain CRF."""
 
-    def __init__(self, transition_params, **kwargs):
+    @typechecked
+    def __init__(self, transition_params: TensorLike, **kwargs):
         """Initialize the CrfDecodeForwardRnnCell.
 
         Args:
@@ -392,7 +423,12 @@ class CrfDecodeForwardRnnCell(tf.keras.layers.AbstractRNNCell):
         return backpointers, new_state
 
 
-def crf_decode_forward(inputs, state, transition_params, sequence_lengths):
+def crf_decode_forward(
+    inputs: TensorLike,
+    state: TensorLike,
+    transition_params: TensorLike,
+    sequence_lengths: TensorLike,
+) -> tf.Tensor:
     """Computes forward decoding in a linear-chain CRF.
 
     Args:
@@ -410,11 +446,12 @@ def crf_decode_forward(inputs, state, transition_params, sequence_lengths):
     mask = tf.sequence_mask(sequence_lengths, tf.shape(inputs)[1])
     crf_fwd_cell = CrfDecodeForwardRnnCell(transition_params)
     crf_fwd_layer = tf.keras.layers.RNN(
-        crf_fwd_cell, return_sequences=True, return_state=True)
+        crf_fwd_cell, return_sequences=True, return_state=True
+    )
     return crf_fwd_layer(inputs, state, mask=mask)
 
 
-def crf_decode_backward(inputs, state):
+def crf_decode_backward(inputs: TensorLike, state: TensorLike) -> tf.Tensor:
     """Computes backward decoding in a linear-chain CRF.
 
     Args:
@@ -437,7 +474,9 @@ def crf_decode_backward(inputs, state):
     return tf.transpose(tf.scan(_scan_fn, inputs, state), [1, 0, 2])
 
 
-def crf_decode(potentials, transition_params, sequence_length):
+def crf_decode(
+    potentials: TensorLike, transition_params: TensorLike, sequence_length: TensorLike
+) -> tf.Tensor:
     """Decode the highest scoring sequence of tags.
 
     Args:
@@ -468,13 +507,16 @@ def crf_decode(potentials, transition_params, sequence_length):
         inputs = tf.slice(potentials, [0, 1, 0], [-1, -1, -1])
 
         sequence_length_less_one = tf.maximum(
-            tf.constant(0, dtype=tf.int32), sequence_length - 1)
+            tf.constant(0, dtype=tf.int32), sequence_length - 1
+        )
 
         backpointers, last_score = crf_decode_forward(
-            inputs, initial_state, transition_params, sequence_length_less_one)
+            inputs, initial_state, transition_params, sequence_length_less_one
+        )
 
         backpointers = tf.reverse_sequence(
-            backpointers, sequence_length_less_one, seq_axis=1)
+            backpointers, sequence_length_less_one, seq_axis=1
+        )
 
         initial_state = tf.cast(tf.argmax(last_score, axis=1), dtype=tf.int32)
         initial_state = tf.expand_dims(initial_state, axis=-1)
@@ -482,8 +524,7 @@ def crf_decode(potentials, transition_params, sequence_length):
         decode_tags = crf_decode_backward(backpointers, initial_state)
         decode_tags = tf.squeeze(decode_tags, axis=[2])
         decode_tags = tf.concat([initial_state, decode_tags], axis=1)
-        decode_tags = tf.reverse_sequence(
-            decode_tags, sequence_length, seq_axis=1)
+        decode_tags = tf.reverse_sequence(decode_tags, sequence_length, seq_axis=1)
 
         best_score = tf.reduce_max(last_score, axis=1)
         return decode_tags, best_score
@@ -497,5 +538,5 @@ def crf_decode(potentials, transition_params, sequence_length):
             return _multi_seq_fn()
     else:
         return tf.cond(
-            tf.equal(tf.shape(potentials)[1], 1), _single_seq_fn,
-            _multi_seq_fn)
+            tf.equal(tf.shape(potentials)[1], 1), _single_seq_fn, _multi_seq_fn
+        )

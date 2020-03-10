@@ -22,12 +22,19 @@ import numpy as np
 
 import tensorflow as tf
 
-from tensorflow_addons.utils import keras_utils, types
+from tensorflow_addons.utils import keras_utils
+from tensorflow_addons.utils.types import (
+    AcceptableDTypes,
+    FloatTensorLike,
+    TensorLike,
+    Initializer,
+)
+
+from typeguard import typechecked
+from typing import Optional, Callable
 
 # TODO: Find public API alternatives to these
 from tensorflow.python.keras.engine import base_layer_utils
-
-from typeguard import typechecked
 
 
 class AttentionMechanism:
@@ -404,11 +411,14 @@ class _BaseAttentionMechanism(AttentionMechanism, tf.keras.layers.Layer):
 
     @property
     def alignments_size(self):
-        return self._alignments_size
+        if isinstance(self._alignments_size, int):
+            return self._alignments_size
+        else:
+            return tf.TensorShape([None])
 
     @property
     def state_size(self):
-        return self._alignments_size
+        return self.alignments_size
 
     def initial_alignments(self, batch_size, dtype):
         """Creates the initial alignment values for the `AttentionWrapper`
@@ -528,13 +538,13 @@ class LuongAttention(_BaseAttentionMechanism):
     @typechecked
     def __init__(
         self,
-        units,
-        memory=None,
-        memory_sequence_length=None,
-        scale=False,
-        probability_fn="softmax",
-        dtype: types.AcceptableDTypes = None,
-        name="LuongAttention",
+        units: TensorLike,
+        memory: Optional[TensorLike] = None,
+        memory_sequence_length: Optional[TensorLike] = None,
+        scale: bool = False,
+        probability_fn: str = "softmax",
+        dtype: AcceptableDTypes = None,
+        name: str = "LuongAttention",
         **kwargs
     ):
         """Construct the AttentionMechanism mechanism.
@@ -705,14 +715,14 @@ class BahdanauAttention(_BaseAttentionMechanism):
     @typechecked
     def __init__(
         self,
-        units,
-        memory=None,
-        memory_sequence_length=None,
-        normalize=False,
-        probability_fn="softmax",
-        kernel_initializer="glorot_uniform",
-        dtype: types.AcceptableDTypes = None,
-        name="BahdanauAttention",
+        units: TensorLike,
+        memory: Optional[TensorLike] = None,
+        memory_sequence_length: Optional[TensorLike] = None,
+        normalize: bool = False,
+        probability_fn: str = "softmax",
+        kernel_initializer: Initializer = "glorot_uniform",
+        dtype: AcceptableDTypes = None,
+        name: str = "BahdanauAttention",
         **kwargs
     ):
         """Construct the Attention mechanism.
@@ -843,7 +853,7 @@ class BahdanauAttention(_BaseAttentionMechanism):
         return cls(**config)
 
 
-def safe_cumprod(x, *args, **kwargs):
+def safe_cumprod(x: TensorLike, *args, **kwargs) -> tf.Tensor:
     """Computes cumprod of x in logspace using cumsum to avoid underflow.
 
     The cumprod function and its gradient can result in numerical instabilities
@@ -867,7 +877,9 @@ def safe_cumprod(x, *args, **kwargs):
         )
 
 
-def monotonic_attention(p_choose_i, previous_attention, mode):
+def monotonic_attention(
+    p_choose_i: FloatTensorLike, previous_attention: FloatTensorLike, mode: str
+) -> tf.Tensor:
     """Compute monotonic attention distribution from choosing probabilities.
 
     Monotonic attention implies that the input sequence is processed in an
@@ -1061,17 +1073,17 @@ class BahdanauMonotonicAttention(_BaseMonotonicAttentionMechanism):
     @typechecked
     def __init__(
         self,
-        units,
-        memory=None,
-        memory_sequence_length=None,
-        normalize=False,
-        sigmoid_noise=0.0,
-        sigmoid_noise_seed=None,
-        score_bias_init=0.0,
-        mode="parallel",
-        kernel_initializer="glorot_uniform",
-        dtype: types.AcceptableDTypes = None,
-        name="BahdanauMonotonicAttention",
+        units: TensorLike,
+        memory: Optional[TensorLike] = None,
+        memory_sequence_length: Optional[TensorLike] = None,
+        normalize: bool = False,
+        sigmoid_noise: FloatTensorLike = 0.0,
+        sigmoid_noise_seed: Optional[FloatTensorLike] = None,
+        score_bias_init: FloatTensorLike = 0.0,
+        mode: str = "parallel",
+        kernel_initializer: Initializer = "glorot_uniform",
+        dtype: AcceptableDTypes = None,
+        name: str = "BahdanauMonotonicAttention",
         **kwargs
     ):
         """Construct the Attention mechanism.
@@ -1245,16 +1257,16 @@ class LuongMonotonicAttention(_BaseMonotonicAttentionMechanism):
     @typechecked
     def __init__(
         self,
-        units,
-        memory=None,
-        memory_sequence_length=None,
-        scale=False,
-        sigmoid_noise=0.0,
-        sigmoid_noise_seed=None,
-        score_bias_init=0.0,
-        mode="parallel",
-        dtype: types.AcceptableDTypes = None,
-        name="LuongMonotonicAttention",
+        units: TensorLike,
+        memory: Optional[TensorLike] = None,
+        memory_sequence_length: Optional[TensorLike] = None,
+        scale: bool = False,
+        sigmoid_noise: FloatTensorLike = 0.0,
+        sigmoid_noise_seed: Optional[FloatTensorLike] = None,
+        score_bias_init: FloatTensorLike = 0.0,
+        mode: str = "parallel",
+        dtype: AcceptableDTypes = None,
+        name: str = "LuongMonotonicAttention",
         **kwargs
     ):
         """Construct the Attention mechanism.
@@ -1377,7 +1389,6 @@ class AttentionWrapperState(
         (
             "cell_state",
             "attention",
-            "time",
             "alignments",
             "alignment_history",
             "attention_state",
@@ -1391,7 +1402,6 @@ class AttentionWrapperState(
       - `cell_state`: The state of the wrapped `RNNCell` at the previous time
         step.
       - `attention`: The attention emitted at the previous time step.
-      - `time`: int32 scalar containing the current time step.
       - `alignments`: A single or tuple of `Tensor`(s) containing the
          alignments emitted at the previous time step for each attention
          mechanism.
@@ -1543,7 +1553,7 @@ def _maybe_mask_score(
     return tf.where(memory_mask, score, score_mask_values)
 
 
-def hardmax(logits, name=None):
+def hardmax(logits: TensorLike, name: Optional[str] = None) -> tf.Tensor:
     """Returns batched one-hot vectors.
 
     The depth index containing the `1` is that of the maximum logit value.
@@ -1604,18 +1614,19 @@ def _compute_attention(
 class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
     """Wraps another `RNNCell` with attention."""
 
+    @typechecked
     def __init__(
         self,
-        cell,
-        attention_mechanism,
-        attention_layer_size=None,
-        alignment_history=False,
-        cell_input_fn=None,
-        output_attention=True,
-        initial_cell_state=None,
-        name=None,
-        attention_layer=None,
-        attention_fn=None,
+        cell: tf.keras.layers.Layer,
+        attention_mechanism: tf.keras.layers.Layer,
+        attention_layer_size: Optional[FloatTensorLike] = None,
+        alignment_history: bool = False,
+        cell_input_fn: Optional[Callable] = None,
+        output_attention: bool = True,
+        initial_cell_state: Optional[TensorLike] = None,
+        name: Optional[str] = None,
+        attention_layer: Optional[tf.keras.layers.Layer] = None,
+        attention_fn: Optional[Callable] = None,
         **kwargs
     ):
         """Construct the `AttentionWrapper`.
@@ -1902,7 +1913,6 @@ class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
         """
         return AttentionWrapperState(
             cell_state=self._cell.state_size,
-            time=tf.TensorShape([]),
             attention=self._get_attention_layer_size(),
             alignments=self._item_or_tuple(
                 a.alignments_size for a in self._attention_mechanisms
@@ -1970,7 +1980,6 @@ class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
             ]
             return AttentionWrapperState(
                 cell_state=cell_state,
-                time=tf.zeros([], dtype=tf.int32),
                 attention=tf.zeros(
                     [batch_size, self._get_attention_layer_size()], dtype=dtype
                 ),
@@ -2023,10 +2032,14 @@ class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
           TypeError: If `state` is not an instance of `AttentionWrapperState`.
         """
         if not isinstance(state, AttentionWrapperState):
-            raise TypeError(
-                "Expected state to be instance of AttentionWrapperState. "
-                "Received type %s instead." % type(state)
-            )
+            try:
+                state = AttentionWrapperState(*state)
+            except TypeError:
+                raise TypeError(
+                    "Expected state to be instance of AttentionWrapperState or "
+                    "values that can construct AttentionWrapperState. "
+                    "Received type %s instead." % type(state)
+                )
 
         # Step 1: Calculate the true inputs to the cell based on the
         # previous attention value.
@@ -2069,7 +2082,9 @@ class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
                 self._attention_layers[i] if self._attention_layers else None,
             )
             alignment_history = (
-                previous_alignment_history[i].write(state.time, alignments)
+                previous_alignment_history[i].write(
+                    previous_alignment_history[i].size(), alignments
+                )
                 if self._alignment_history
                 else ()
             )
@@ -2081,7 +2096,6 @@ class AttentionWrapper(tf.keras.layers.AbstractRNNCell):
 
         attention = tf.concat(all_attentions, 1)
         next_state = AttentionWrapperState(
-            time=state.time + 1,
             cell_state=next_cell_state,
             attention=attention,
             attention_state=self._item_or_tuple(all_attention_states),
