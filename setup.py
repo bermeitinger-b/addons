@@ -86,6 +86,7 @@ setup(
     author="Google Inc.",
     author_email="opensource@google.com",
     packages=find_packages(),
+    ext_modules=get_ext_modules(),
     include_package_data=True,
     zip_safe=False,
     distclass=BinaryDistribution,
