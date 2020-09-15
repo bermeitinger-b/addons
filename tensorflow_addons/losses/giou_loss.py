@@ -14,15 +14,17 @@
 # ==============================================================================
 """Implements GIoU loss."""
 
-import tensorflow as tf
-
-from tensorflow_addons.utils.types import TensorLike
 from typing import Optional
+
+import tensorflow as tf
 from typeguard import typechecked
+
+from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
+from tensorflow_addons.utils.types import TensorLike
 
 
 @tf.keras.utils.register_keras_serializable(package="Addons")
-class GIoULoss(tf.keras.losses.Loss):
+class GIoULoss(LossFunctionWrapper):
     """Implements the GIoU loss function.
 
     GIoU loss was first introduced in the
@@ -33,19 +35,17 @@ class GIoULoss(tf.keras.losses.Loss):
 
     Usage:
 
-    ```python
-    gl = tfa.losses.GIoULoss()
-    boxes1 = tf.constant([[4.0, 3.0, 7.0, 5.0], [5.0, 6.0, 10.0, 7.0]])
-    boxes2 = tf.constant([[3.0, 4.0, 6.0, 8.0], [14.0, 14.0, 15.0, 15.0]])
-    loss = gl(boxes1, boxes2)
-    print('Loss: ', loss.numpy())  # Loss: [1.07500000298023224, 1.9333333373069763]
-    ```
-    Usage with tf.keras API:
+    >>> gl = tfa.losses.GIoULoss()
+    >>> boxes1 = tf.constant([[4.0, 3.0, 7.0, 5.0], [5.0, 6.0, 10.0, 7.0]])
+    >>> boxes2 = tf.constant([[3.0, 4.0, 6.0, 8.0], [14.0, 14.0, 15.0, 15.0]])
+    >>> loss = gl(boxes1, boxes2)
+    >>> loss
+    <tf.Tensor: shape=(), dtype=float32, numpy=1.5041667>
 
-    ```python
-    model = tf.keras.Model(inputs, outputs)
-    model.compile('sgd', loss=tfa.losses.GIoULoss())
-    ```
+    Usage with `tf.keras` API:
+
+    >>> model = tf.keras.Model()
+    >>> model.compile('sgd', loss=tfa.losses.GIoULoss())
 
     Args:
       mode: one of ['giou', 'iou'], decided to calculate GIoU or IoU loss.
@@ -58,24 +58,19 @@ class GIoULoss(tf.keras.losses.Loss):
         reduction: str = tf.keras.losses.Reduction.AUTO,
         name: Optional[str] = "giou_loss",
     ):
-        if mode not in ["giou", "iou"]:
-            raise ValueError("Value of mode should be 'iou' or 'giou'")
-        super().__init__(name=name, reduction=reduction)
-        self.mode = mode
-
-    def get_config(self):
-        base_config = super().get_config()
-        base_config["mode"] = self.mode
-        return base_config
-
-    def call(self, y_true, y_pred):
-        return giou_loss(y_true, y_pred, mode=self.mode)
+        super().__init__(giou_loss, name=name, reduction=reduction, mode=mode)
 
 
 @tf.keras.utils.register_keras_serializable(package="Addons")
-@tf.function
 def giou_loss(y_true: TensorLike, y_pred: TensorLike, mode: str = "giou") -> tf.Tensor:
-    """
+    """Implements the GIoU loss function.
+
+    GIoU loss was first introduced in the
+    [Generalized Intersection over Union:
+    A Metric and A Loss for Bounding Box Regression]
+    (https://giou.stanford.edu/GIoU.pdf).
+    GIoU is an enhancement for models which use IoU in object detection.
+
     Args:
         y_true: true targets tensor. The coordinates of the each bounding
             box in boxes are encoded as [y_min, x_min, y_max, x_max].
@@ -92,7 +87,7 @@ def giou_loss(y_true: TensorLike, y_pred: TensorLike, mode: str = "giou") -> tf.
     if not y_pred.dtype.is_floating:
         y_pred = tf.cast(y_pred, tf.float32)
     y_true = tf.cast(y_true, y_pred.dtype)
-    giou = _calculate_giou(y_pred, y_true, mode)
+    giou = tf.squeeze(_calculate_giou(y_pred, y_true, mode))
 
     return 1 - giou
 

@@ -16,11 +16,12 @@
 
 import tensorflow as tf
 from typeguard import typechecked
+from tensorflow_addons.utils.keras_utils import LossFunctionWrapper
 from tensorflow_addons.utils.types import TensorLike, FloatTensorLike
 
 
-@tf.keras.utils.register_keras_serializable(package="Addons")
 @tf.function
+@tf.keras.utils.register_keras_serializable(package="Addons")
 def pinball_loss(
     y_true: TensorLike, y_pred: TensorLike, tau: FloatTensorLike = 0.5
 ) -> tf.Tensor:
@@ -34,14 +35,11 @@ def pinball_loss(
     See: https://en.wikipedia.org/wiki/Quantile_regression
 
     Usage:
-    ```python
-    loss = pinball_loss([0., 0., 1., 1.], [1., 1., 1., 0.], tau=.1)
 
-    # loss = max(0.1 * (y_true - y_pred), (0.1 - 1) * (y_true - y_pred))
-    #      = (0.9 + 0.9 + 0 + 0.1) / 4
-
-    print('Loss: ', loss.numpy())  # Loss: 0.475
-    ```
+    >>> loss = tfa.losses.pinball_loss([0., 0., 1., 1.],
+    ... [1., 1., 1., 0.], tau=.1)
+    >>> loss
+    <tf.Tensor: shape=(), dtype=float32, numpy=0.475>
 
     Args:
       y_true: Ground truth values. shape = `[batch_size, d0, .. dN]`
@@ -62,18 +60,17 @@ def pinball_loss(
     y_pred = tf.convert_to_tensor(y_pred)
     y_true = tf.cast(y_true, y_pred.dtype)
 
-    # broadcast the pinball slope along the batch dimension, and clip to
-    # acceptable values
+    # Broadcast the pinball slope along the batch dimension
     tau = tf.expand_dims(tf.cast(tau, y_pred.dtype), 0)
     one = tf.cast(1, tau.dtype)
 
     delta_y = y_true - y_pred
     pinball = tf.math.maximum(tau * delta_y, (tau - one) * delta_y)
-    return tf.reduce_mean(tf.keras.backend.batch_flatten(pinball), axis=-1)
+    return tf.reduce_mean(pinball, axis=-1)
 
 
 @tf.keras.utils.register_keras_serializable(package="Addons")
-class PinballLoss(tf.keras.losses.Loss):
+class PinballLoss(LossFunctionWrapper):
     """Computes the pinball loss between `y_true` and `y_pred`.
 
     `loss = maximum(tau * (y_true - y_pred), (tau - 1) * (y_true - y_pred))`
@@ -84,22 +81,16 @@ class PinballLoss(tf.keras.losses.Loss):
     See: https://en.wikipedia.org/wiki/Quantile_regression
 
     Usage:
-    ```python
-    pinball = tfa.losses.PinballLoss(tau=.1)
-    loss = pinball([0., 0., 1., 1.], [1., 1., 1., 0.])
 
-    # loss = max(0.1 * (y_true - y_pred), (0.1 - 1) * (y_true - y_pred))
-    #      = (0.9 + 0.9 + 0 + 0.1) / 4
+    >>> pinball = tfa.losses.PinballLoss(tau=.1)
+    >>> loss = pinball([0., 0., 1., 1.], [1., 1., 1., 0.])
+    >>> loss
+    <tf.Tensor: shape=(), dtype=float32, numpy=0.475>
 
-    print('Loss: ', loss.numpy())  # Loss: 0.475
-    ```
+    Usage with the `tf.keras` API:
 
-    Usage with the `compile` API:
-
-    ```python
-    model = tf.keras.Model(inputs, outputs)
-    model.compile('sgd', loss=tfa.losses.PinballLoss(tau=.1))
-    ```
+    >>> model = tf.keras.Model()
+    >>> model.compile('sgd', loss=tfa.losses.PinballLoss(tau=.1))
 
     Args:
       tau: (Optional) Float in [0, 1] or a tensor taking values in [0, 1] and
@@ -130,15 +121,4 @@ class PinballLoss(tf.keras.losses.Loss):
         reduction: str = tf.keras.losses.Reduction.AUTO,
         name: str = "pinball_loss",
     ):
-        super().__init__(reduction=reduction, name=name)
-        self.tau = tau
-
-    def call(self, y_true: TensorLike, y_pred: TensorLike) -> tf.Tensor:
-        return pinball_loss(y_true, y_pred, self.tau)
-
-    def get_config(self):
-        config = {
-            "tau": self.tau,
-        }
-        base_config = super().get_config()
-        return {**base_config, **config}
+        super().__init__(pinball_loss, reduction=reduction, name=name, tau=tau)

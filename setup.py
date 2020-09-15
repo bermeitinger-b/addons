@@ -25,6 +25,7 @@ of the community).
 """
 
 import os
+from pathlib import Path
 import sys
 
 from datetime import datetime
@@ -35,34 +36,36 @@ from setuptools import Extension
 
 DOCLINES = __doc__.split("\n")
 
-TFA_NIGHTLY = "tfa-nightly"
-TFA_RELEASE = "tensorflow-addons"
 
-if "--nightly" in sys.argv:
-    project_name = TFA_NIGHTLY
-    nightly_idx = sys.argv.index("--nightly")
-    sys.argv.pop(nightly_idx)
-else:
-    project_name = TFA_RELEASE
+def get_last_commit_time() -> str:
+    string_time = os.getenv("NIGHTLY_TIME").replace('"', "")
+    return datetime.strptime(string_time, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d%H%M%S")
 
-ext_modules = []
-if "--platlib-patch" in sys.argv:
-    if sys.platform.startswith("linux"):
-        # Manylinux2010 requires a patch for platlib
-        ext_modules = [Extension("_foo", ["stub.cc"])]
-    sys.argv.remove("--platlib-patch")
 
-# Version
-version = {}
-base_dir = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(base_dir, "tensorflow_addons", "version.py")) as fp:
-    exec(fp.read(), version)
+def get_project_name_version():
+    # Version
+    version = {}
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(base_dir, "tensorflow_addons", "version.py")) as fp:
+        exec(fp.read(), version)
 
-if project_name == TFA_NIGHTLY:
-    version["__version__"] += datetime.now().strftime("%Y%m%d%H%M%S")
+    project_name = "tensorflow-addons"
+    if "--nightly" in sys.argv:
+        project_name = "tfa-nightly"
+        version["__version__"] += get_last_commit_time()
+        sys.argv.remove("--nightly")
 
-with open("requirements.txt") as f:
-    required_pkgs = f.read().splitlines()
+    return project_name, version
+
+
+def get_ext_modules():
+    ext_modules = []
+    if "--platlib-patch" in sys.argv:
+        if sys.platform.startswith("linux"):
+            # Manylinux2010 requires a patch for platlib
+            ext_modules = [Extension("_foo", ["stub.cc"])]
+        sys.argv.remove("--platlib-patch")
+    return ext_modules
 
 
 class BinaryDistribution(Distribution):
@@ -72,6 +75,9 @@ class BinaryDistribution(Distribution):
         return True
 
 
+project_name, version = get_project_name_version()
+min_tf_version = version["MIN_TF_VERSION"]
+max_tf_version = version["MAX_TF_VERSION"]
 setup(
     name=project_name,
     version=version["__version__"],
@@ -90,9 +96,11 @@ setup(
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Scientific/Engineering :: Mathematics",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Software Development :: Libraries",

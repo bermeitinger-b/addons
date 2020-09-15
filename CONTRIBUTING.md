@@ -86,7 +86,8 @@ This is if you want to stay in Windows world. In this case, you need:
  [This link](https://github.com/tensorflow/addons/issues/1134) might help you.
 
 ## Development Tips
-Try these useful commands below:
+Try these useful commands below, they only use Docker and 
+don't require anything else (not even python installed):
 
 * Format code automatically: `bash tools/pre-commit.sh`
 * Run sanity check: `bash tools/run_sanity_check.sh`
@@ -100,7 +101,7 @@ If you're running Powershell on Windows, use `sh` instead of `bash` when typing 
 We provide a pre-commit hook to format your code automatically before each
 commit, so that you don't have to read our style guide. Install it on Linux/MacOS with
 
-```
+```bash
 cd .git/hooks && ln -s -f ../../tools/pre-commit.sh pre-commit
 ```
 
@@ -108,7 +109,7 @@ and you're good to go.
 
 On Windows, in powershell, do:
 
-```
+```bash
 cd .git/hooks
 cmd /c mklink pre-commit ..\..\tools\pre-commit.sh
 ```
@@ -125,54 +126,10 @@ See our [Style Guide](STYLE_GUIDE.md) for more details.
 Nightly CI tests are ran and results can be found on the central README. To
 subscribe for alerts please join the [addons-testing mailing list](https://groups.google.com/a/tensorflow.org/forum/#!forum/addons-testing).
 
-### Locally Testing 
 
-#### CPU Testing Script
-```bash
-bash tools/run_cpu_tests.sh
-```
+### Testing locally, without Docker
 
-On PowerShell, just use `sh` instead of `bash`.
-
-#### GPU Testing Script
-```bash
-bash tools/run_gpu_tests.sh
-```
-
-On PowerShell, just use `sh` instead of `bash`.
-
-#### Run Manually
-
-It is recommend that tests are ran within docker images, but should still work on host.
-
-CPU Docker: 
-```
-docker run --rm -it -v ${PWD}:/addons -w /addons tensorflow/tensorflow:2.1.0-custom-op-ubuntu16
-```
-
-GPU Docker: 
-```
-docker run --runtime=nvidia --rm -it -v ${PWD}:/addons -w /addons tensorflow/tensorflow:2.1.0-custom-op-gpu-ubuntu16
-```
-
-Configure:
-```
-python3 ./configure.py  # Links project with TensorFlow dependency
-```
-Run selected tests:
-```bash
-bazel test -c opt -k \
---test_timeout 300,450,1200,3600 \
---test_output=all \
---run_under=$(readlink -f tools/testing/parallel_gpu_execute.sh) \
-//tensorflow_addons/<test_selection>
-```
-
-`<test_selection>` can be `...` for all tests or `<package>:<py_test_name>` for individual tests.
-`<package>` can be any package name like `metrics` for example.
-`<py_test_name>` can be any test name given by the `BUILD` file or `*` for all tests of the given package.
-
-### Setup your development environment
+When running outside Docker, you can use your IDE to debug, and use your local tools to work.
 
 If you're just modifying Python code (as opposed to C++/CUDA code), 
 then you don't need to use Bazel to run your tests. 
@@ -183,7 +140,7 @@ And you don't need to compile anything.
 If you want to work in 
 a [virtualenv](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/):
 
-```
+```bash
 pip install virtualenv
 venv my_dev_environement
 source my_dev_environement/bin/activate  # Linux/macos/WSL2
@@ -192,7 +149,7 @@ source my_dev_environement/bin/activate  # Linux/macos/WSL2
 
 If you want to work in 
 a [conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html):
-```
+```bash
 conda create --name my_dev_environement
 conda activate my_dev_environement
 ```
@@ -202,7 +159,9 @@ conda activate my_dev_environement
 
 Just run from the root:
 
-```
+```bash
+pip install tensorflow==2.3.0
+# you can use "pip install tensorflow-cpu==2.3.0" too if you're not testing on gpu.
 pip install -e ./
 ```
 
@@ -217,7 +176,7 @@ going to import the code in this git repository.
 To undo this operation, for example, you want to later on 
 install TensorFlow Addons from PyPI, the release version, do:
 
-```
+```bash
 pip uninstall tensorflow-addons
 ```
 
@@ -227,7 +186,7 @@ If TensorFlow Addons is installed in editable mode, you can then just run your t
 running Pytest. For example:
 ```bash
 pip install -r tools/install_deps/pytest.txt
-python -m pytest tensorflow_addons/rnn/cell_test.py
+python -m pytest tensorflow_addons/rnn/tests/cell_test.py
 # or even
 python -m pytest tensorflow_addons/rnn/
 # or even 
@@ -242,6 +201,9 @@ Pytest has many cool options to help you make great tests:
 # Use multiprocessing to run the tests, 3 workers
 pytest -n 3 tensorflow_addons/
 pytest -n auto tensorflow_addons/
+
+# Run the whole test suite without compiling any custom ops (.so files).
+pytest -v --skip-custom-ops tensorflow_addons/
 
 # Open the debugger to inspect variables and execute code when 
 # an exception is raised.
@@ -269,21 +231,6 @@ pytest -k "test_get_all_shared_objects" ./tensorflow_addons/
 pytest --duration=10 tensorflow_addons/
 ```
 
-#### Compiling custom ops
-
-If you need a custom C++/Cuda op for your test, compile your ops with
-
-```bash
-python configure.py
-python configure.py --no-deps   # if you don't want any dependencies installed with pip
-bash tools/install_so_files.sh  # Linux/macos/WSL2
-sh tools/install_so_files.sh    # PowerShell
-```
-
-Note that you need bazel, a C++ compiler and a NVCC compiler (if you want to test
-Cuda ops). For that reason, we recommend you [run inside the custom-op docker containers](#run-manually)
-
-
 #### Testing with Pycharm
 
 Pycharm has a debugger build in the IDE for visual inspection of variables
@@ -295,6 +242,106 @@ functions from the little green arrows next to it. And you can add
  that you use pytest as your main test runner, not unittest (the default one). 
  
  For that, go in File -> Settings -> search box -> Default test runner -> Select "Pytest".
+
+#### Compiling custom ops
+
+If you need a custom C++/Cuda op for your test, compile your ops with
+
+```bash
+python configure.py
+pip install tensorflow==2.3.0 -e ./ -r tools/install_deps/pytest.txt
+bash tools/install_so_files.sh  # Linux/macos/WSL2
+sh tools/install_so_files.sh    # PowerShell
+```
+
+Note that you need bazel, a C++ compiler and a NVCC compiler (if you want to test
+Cuda ops). For that reason, we recommend you run inside the custom-op docker containers. 
+This will avoid you the hassle of installing Bazel, GCC/clang...
+See below.
+
+
+#### Run Manually
+
+Running tests interactively in Docker gives you good flexibility and doesn't require 
+to install any additional tools.
+
+CPU Docker: 
+```bash
+docker run --rm -it -v ${PWD}:/addons -w /addons tensorflow/tensorflow:2.1.0-custom-op-ubuntu16
+```
+
+GPU Docker: 
+```bash
+docker run --gpus all --rm -it -v ${PWD}:/addons -w /addons tensorflow/tensorflow:2.1.0-custom-op-gpu-ubuntu16
+```
+
+Configure:
+```bash
+python3 -m pip install tensorflow==2.3.0
+python3 ./configure.py  # Links project with TensorFlow dependency
+```
+
+Install in editable mode
+```bash
+python3 -m pip install -e .
+python3 -m pip install -r tools/install_deps/pytest.txt
+```
+
+Compile the custom ops
+```bash
+bash tools/install_so_files.sh
+```
+
+Run selected tests:
+```bash
+python3 -m pytest path/to/file/or/directory/to/test
+```
+
+Run the gpu only tests with `pytest -m needs_gpu ./tensorflow_addons`.
+Run the cpu only tests with `pytest -m 'not needs_gpu' ./tensorflow_addons`.
+
+
+#### Testing with Bazel
+
+Testing with Bazel is still supported but not recommended unless you have prior experience 
+with Bazel, and would like to use it for specific capabilities (Remote execution, etc).
+This is because pytest offers many more options to run your test suite and has
+better error reports, timings reports, open-source plugins and documentation online 
+for Python testing. 
+
+Internally, Google can use Bazel to test many commits 
+quickly, as Bazel has great support for caching and distributed testing.
+
+To test with Bazel:
+
+```bash
+python3 -m pip install tensorflow==2.3.0
+python3 configure.py
+python3 -m pip install -r tools/install_deps/pytest.txt
+bazel test -c opt -k \
+--test_timeout 300,450,1200,3600 \
+--test_output=all \
+--run_under=$(readlink -f tools/testing/parallel_gpu_execute.sh) \
+//tensorflow_addons/...
+```
+
+#### Testing docstrings
+
+We use [DocTest](https://docs.python.org/3/library/doctest.html) to test code snippets
+in Python docstrings. The snippet must be executable Python code.
+To enable testing, prepend the line with `>>>` (three left-angle brackets).
+Available namespace include `np` for numpy, `tf` for TensorFlow, and `tfa` for TensorFlow Addons.
+See [docs_ref](https://www.tensorflow.org/community/contribute/docs_ref) for more details.
+
+To test docstrings locally, run either
+```bash
+bash tools/run_cpu_tests.sh
+```
+on all files, or
+```bash
+pytest -v -n auto --durations=25 --doctest-modules /path/to/pyfile
+```
+on specific files.
 
 ## About type hints
 
@@ -325,9 +372,192 @@ Since adding type hints can be hard, especially for people who are not
 familiar with it, we made a big todo-list of functions/class constructors that 
 need typing. If you want to add a feature to the public API and 
 don't want to bother adding type hints, please add your feature to the todo-list 
-in [tools/testing/check_typing_info.py](tools/testing/check_typing_info.py).
+in [tools/testing/source_code_test.py](tools/testing/source_code_test.py).
 
 Help is welcome to make this TODO list smaller!
+
+## Writing tests
+
+If you add a new feature, you should add tests to ensure that new code changes 
+doesn't introduce bugs.
+
+If you fix a bug, you should add a tests which fails before your patch and passes 
+after your patch.
+
+We use [Pytest](https://docs.pytest.org/en/latest/) to write tests. We encourage you
+to read the documentation, but you'll find a quick summary here:
+
+* If you're testing code written in `xxx.py`, your tests should be in `xxx_test.py`.
+* In `xxx_test.py`, all functions starting with `test_` are collected and run by Pytest.
+* Tests are run with the TF 2.x behavior, meaning eager mode my default, unless you use a `tf.function`.
+* Ensure something is working by using `assert`. For example: `assert my_variable in my_list`.
+* When comparing numpy arrays, use 
+the [testing module of numpy](https://docs.scipy.org/doc/numpy/reference/routines.testing.html).
+Note that since TensorFlow ops often run with float32 of float16, you might need to 
+increase the default `atol` and `rtol`. You can take a look at [the default values used 
+in the TensorFlow repository](https://www.tensorflow.org/api_docs/python/tf/test/TestCase#assertAllClose).
+* Prefer using your code's public API when writing tests. It ensures future refactoring is possible
+without changing the tests.
+* When testing multiple configurations, prefer using
+ [parametrize](https://docs.pytest.org/en/latest/parametrize.html) rather than for 
+ loops for a clearer error report.
+* Running all the tests in a single file should take no more than 5 seconds. You very 
+rarely need to do heavy computation to test things. Your tests should be small and 
+focused on a specific feature/parameter.
+* Don't be afraid to write too many tests. This is fine as long as they're fast.
+
+### Code example
+* It is required to contribute a code example in the docstring when adding new features.
+* It is strongly suggested to expand or contribute a new [tutorial](https://github.com/tensorflow/addons/blob/master/docs/tutorials/README.md) for more complex features that are hard to be expressed in the docstring only.
+
+### Fixtures and assert functions:
+We provide [fixtures](https://docs.pytest.org/en/latest/fixture.html) to help your write 
+your tests as well as helper functions. Those can be found in 
+[test_utils.py](https://github.com/tensorflow/addons/blob/master/tensorflow_addons/utils/test_utils.py).
+
+#### maybe_run_functions_eagerly
+
+Will run your test function twice, once normally and once with 
+`tf.config.experimental_run_functions_eagerly(True)`. To use it:
+
+```python
+@pytest.mark.usefixtures("maybe_run_functions_eagerly")
+def test_something():
+    assert ...== ...
+```
+
+##### When to use it?
+
+You should use it only if you are using `tf.function` and running some control flow
+on Tensors, `if` or `for` for example. Or with `TensorArray`. In short, when the 
+ conversion to graph is not trivial. No need to use it on all
+your tests. Having fast tests is important.
+
+#### Selecting the devices to run the test
+
+By default, each test is wrapped behind the scenes with a 
+```python
+with tf.device("CPU:0"):
+    ...
+```
+
+This is automatic. But it's also possible to ask the test runner to run 
+the test twice, on CPU and on GPU, or only on GPU. Here is how to do it.
+
+```python
+import pytest
+import tensorflow as tf
+from tensorflow_addons.utils import test_utils
+
+@pytest.mark.with_device(["cpu", "gpu"])
+def test_something():
+    # the code here will run twice, once on gpu, once on cpu.
+    ...
+
+
+@pytest.mark.with_device(["cpu", "gpu"])
+def test_something2(device):
+    # the code here will run twice, once on gpu, once on cpu.
+    # device will be "cpu:0" or "gpu:0" or "gpu:1" or "gpu:2" ...   
+    if "cpu" in device:
+        print("do something.")
+    if "gpu" in device:
+        print("do something else.")
+
+
+
+@pytest.mark.with_device(["cpu", "gpu", tf.distribute.MirroredStrategy])
+def test_something3(device):
+    # the code here will run three times, once on gpu, once on cpu and once with 
+    # a mirror distributed strategy.
+    # device will be "cpu:0" or "gpu:0" or the strategy.
+    # with the MirroredStrategy, it's equivalent to:
+    # strategy = tf.distribute.MirroredStrategy(...)
+    # with strategy.scope():
+    #     test_function(strategy)
+    if "cpu" in device:
+        print("do something.")
+    if "gpu" in device:
+        print("do something else.")
+    if isinstance(device, tf.distribute.Strategy):
+        device.run(...)
+
+
+@pytest.mark.with_device(["gpu"])
+def test_something_else():
+    # This test will be only run on gpu.
+    # The test runner will call with tf.device("GPU:0") behind the scenes.  
+    ...
+
+@pytest.mark.with_device(["cpu"])
+def test_something_more():
+    # Don't do that, this is the default behavior. 
+    ...
+
+
+@pytest.mark.with_device(["no_device"])
+@pytest.mark.needs_gpu
+def test_something_more2():
+    # When running the function, there will be no `with tf.device` wrapper.
+    # You are free to do whatever you wish with the devices in there.
+    # Make sure to use only the cpu, or only gpus available to the current process with
+    # test_utils.gpu_for_testing() , otherwise, it might not play nice with 
+    # pytest's multiprocessing.
+    # If you use a gpu, mark the test with @pytest.mark.needs_gpu , otherwise the 
+    # test will fail if no gpu is available on the system.
+    # for example
+    ...
+    strategy = tf.distribute.MirroredStrategy(test_utils.gpus_for_testing())
+    with strategy.scope():
+        print("I'm doing whatever I want.") 
+    ...
+```
+
+Note that if a gpu is not detected on the system, the test will be 
+skipped and not marked as failed. Only the first gpu of the system is used,
+even when running pytest in multiprocessing mode. (`-n` argument). 
+Beware of the out of cuda memory errors if the number of pytest workers is too high.
+
+##### When to use it?
+
+When you test custom CUDA code or float16 ops.
+We can expect other existing TensorFlow ops to behave the same on CPU and GPU.
+
+#### data_format
+
+Will run your test function twice, once with `data_format` being `channels_first` and 
+once with `data_format` being `channels_last`. To use it:
+
+```python
+def test_something(data_format):
+    assert my_function_to_test(..., data_format=data_format) == ...
+```
+
+##### When to use it?
+
+When your function has a `data_format` argument. You'll want to make sure your 
+function behaves correctly with both data format.
+
+
+#### assert_allclose_according_to_type
+
+Is the same as [tf.test.TestCase.assertAllCloseAccordingToType](https://www.tensorflow.org/api_docs/python/tf/test/TestCase#assertAllCloseAccordingToType)
+but doesn't require any subclassing to be done. Can be used as a plain function. To use it:
+
+```python
+from tensorflow_addons.utils import test_utils
+
+def test_something():
+    expected = ...
+    computed = my_function_i_just_wrote(...).numpy()
+    test_utils.assert_allclose_according_to_type(computed, expected)
+```
+
+##### When to use it?
+
+When you want to test your function with multiple dtypes. Different dtypes requires 
+different tolerances when comparing values.
+
 
 ## Code Reviews
 

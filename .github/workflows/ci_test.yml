@@ -10,9 +10,6 @@ on:
       - master
       - r*
 
-env:
-  BAZEL_VERSION: 1.1.0
-
 jobs:
   flake8-test:
     name: Flake8
@@ -28,20 +25,13 @@ jobs:
       - uses: actions/checkout@v2
       - name: Ensure contributor used ("black ./") before commit
         run: bash tools/run_build.sh black-test
-  public-api-typed:
-    name: Check that the public API is typed
+  source_code_test:
+    name: Check that the source code is compliant
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Run type check
-        run: bash tools/run_build.sh public-api-typed
-  case-insensitive-filesystem:
-    name: Verify python filenames work on case insensitive FS
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run type check
-        run: bash tools/run_build.sh case-insensitive-filesystem
+        run: bash tools/run_build.sh source_code_test
   valid_build_files:
     name: Valid build files
     runs-on: ubuntu-latest
@@ -77,12 +67,23 @@ jobs:
       - uses: actions/checkout@v2
       - name: Building the docs
         run: bash tools/run_build.sh docs_tests
-  test_editable_mode:
-    name: Check that we can fully work in editable mode
+  test_python_code_only:
+    name: Fast build to run python-only tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.5
+      - uses: actions/checkout@v2
+      - run: pip install --default-timeout=1000 -r tools/install_deps/tensorflow-cpu.txt -r tools/install_deps/pytest.txt
+      - run: pip install -e ./
+      - run: pytest -v -n auto --skip-custom-ops ./tensorflow_addons
+  test_cpu_in_small_docker_image:
+    name: Run the cpu tests in a small python docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: bash tools/run_build.sh test_editable_mode
+      - run: bash tools/run_cpu_tests.sh
   valid-codeowners:
     name: Check that the CODEOWNERS is valid
     runs-on: ubuntu-latest
@@ -94,3 +95,32 @@ jobs:
       - run: pip install pygithub click
       - name: Check that the CODEOWNERS is valid
         run: python .github/workflows/notify_codeowners.py .github/CODEOWNERS
+  nbfmt:
+    name: Notebook format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v1
+    - uses: actions/checkout@v2
+    - name: Install tensorflow-docs
+      run: python3 -m pip install -U git+https://github.com/tensorflow/docs
+    - name: Check notebook formatting
+      run: |
+        # Run on all notebooks to prevent upstream change.
+        echo "Check formatting with nbfmt:"
+        python3 -m tensorflow_docs.tools.nbfmt --test \
+            $(find docs/tutorials/ -type f -name *.ipynb)
+  nblint:
+    name: Notebook lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-python@v1
+    - uses: actions/checkout@v2
+    - name: Install tensorflow-docs
+      run: python3 -m pip install -U git+https://github.com/tensorflow/docs
+    - name: Lint notebooks
+      run: |
+        # Run on all notebooks to prevent upstream change.
+        echo "Lint check with nblint:"
+        python3 -m tensorflow_docs.tools.nblint \
+            --arg=repo:tensorflow/addons \
+            $(find docs/tutorials/ -type f -name *.ipynb ! -path "docs/tutorials/_template.ipynb")
