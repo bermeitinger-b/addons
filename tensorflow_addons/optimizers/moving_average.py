@@ -45,23 +45,18 @@ class MovingAverage(AveragedOptimizerWrapper):
     def __init__(
         self,
         optimizer: types.Optimizer,
-        sequential_update: bool = True,
         average_decay: types.FloatTensorLike = 0.99,
         num_updates: Union[None, int, tf.Variable] = None,
         start_step: int = 0,
         dynamic_decay: bool = False,
         name: str = "MovingAverage",
-        **kwargs
+        **kwargs,
     ):
         r"""Construct a new MovingAverage optimizer.
 
         Args:
             optimizer: str or `tf.keras.optimizers.Optimizer` that will be
                 used to compute and apply gradients.
-            sequential_update: Bool. If False, will compute the moving average
-                at the same time as the model is updated, potentially doing
-                benign data races. If True, will update the moving average
-                after gradient updates.
             average_decay: float. Decay to use to maintain the moving averages
                 of trained variables.
             num_updates: Optional count of the number of updates applied to
@@ -79,7 +74,7 @@ class MovingAverage(AveragedOptimizerWrapper):
                 decay of learning rate. `lr` is included for backward
                 compatibility, recommended to use `learning_rate` instead.
         """
-        super().__init__(optimizer, sequential_update, name, **kwargs)
+        super().__init__(optimizer, name, **kwargs)
         self._num_updates = num_updates
         if self._num_updates is not None:
             if isinstance(self._num_updates, tf.Variable):
@@ -127,11 +122,12 @@ class MovingAverage(AveragedOptimizerWrapper):
         return {**base_config, **config}
 
     def _create_slots(self, var_list):
-        self._optimizer._create_slots(
-            var_list=var_list
-        )  # pylint: disable=protected-access
+        self._optimizer._create_slots(var_list=var_list)
         for var in var_list:
             self.add_slot(var, "average", var.read_value())
+
+        self._average_weights = [self.get_slot(var, "average") for var in var_list]
+        self._model_weights = var_list
 
     def shadow_copy(self, model_weights):
         """Creates shadow variables for the given model weights."""
