@@ -28,6 +28,7 @@ COPY requirements.txt .
 RUN python -m pip install -r requirements.txt
 
 COPY ./ /addons
+RUN rm /addons/.bazelversion
 WORKDIR /addons
 
 # -------------------------------------------------------------------
@@ -38,9 +39,11 @@ CMD ["bash", "tools/testing/build_and_run_tests.sh"]
 FROM base_install as make_wheel
 ARG NIGHTLY_FLAG
 ARG NIGHTLY_TIME
+
+RUN python configure.py
+
 RUN bash tools/testing/build_and_run_tests.sh && \
     bazel build \
-        -c opt \
         --noshow_progress \
         --noshow_loading_progress \
         --verbose_failures \

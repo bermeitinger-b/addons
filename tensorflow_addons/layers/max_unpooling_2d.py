@@ -16,8 +16,10 @@
 
 import tensorflow as tf
 
-from tensorflow_addons.utils.keras_utils import normalize_tuple
 from typeguard import typechecked
+from typing import Union
+
+from tensorflow_addons.utils.keras_utils import normalize_tuple
 
 
 def _calculate_output_shape(input_shape, pool_size, strides, padding):
@@ -57,6 +59,7 @@ def _max_unpooling_2d(updates, mask, pool_size=(2, 2), strides=(2, 2), padding="
     def func(updates, mask):
         mask = tf.cast(mask, "int32")
         input_shape = tf.shape(updates, out_type="int32")
+        input_shape = [updates.shape[i] or input_shape[i] for i in range(4)]
         output_shape = _calculate_output_shape(input_shape, pool_size, strides, padding)
 
         # Calculates indices for batch, height, width and feature maps.
@@ -105,7 +108,13 @@ class MaxUnpooling2D(tf.keras.layers.Layer):
     """
 
     @typechecked
-    def __init__(self, pool_size=(2, 2), strides=(2, 2), padding="SAME", **kwargs):
+    def __init__(
+        self,
+        pool_size: Union[list, tuple, int] = (2, 2),
+        strides: Union[list, tuple, int] = (2, 2),
+        padding: str = "SAME",
+        **kwargs,
+    ):
         super(MaxUnpooling2D, self).__init__(**kwargs)
 
         if padding != "SAME" and padding != "VALID":
